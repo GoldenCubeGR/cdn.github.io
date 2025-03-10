@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Protected File List</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        #file-list { margin-top: 20px; display: none; }
+        input, button { margin: 10px; padding: 10px; }
+        ul { list-style-type: none; padding: 0; }
+        li { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h2>Enter Password</h2>
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="checkPassword()">Submit</button>
+    <p id="error" style="color: red;"></p>
+    
+    <div id="file-list">
+        <h2>Files in this directory:</h2>
+        <ul id="files"></ul>
+    </div>
+
+    <script>
+        const storedHash = "5e884898da28047151d0e56f8dc6292773603d0d6aabbddaa6f9c7b3797b44a1"; // hash for "password"
+        
+        async function hashPassword(password) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function checkPassword() {
+            const inputPassword = document.getElementById("password").value;
+            const hashedInput = await hashPassword(inputPassword);
+            if (hashedInput === storedHash) {
+                document.getElementById("file-list").style.display = "block";
+                document.getElementById("error").innerText = "";
+                document.getElementById("password").style.display = "none";
+                document.querySelector("button").style.display = "none";
+                listFiles();
+            } else {
+                document.getElementById("error").innerText = "Incorrect password!";
+            }
+        }
+
+        function listFiles() {
+            if (!window.showOpenFilePicker) {
+                document.getElementById("files").innerHTML = "<li>Your browser does not support this feature.</li>";
+                return;
+            }
+            window.showDirectoryPicker().then(async (dirHandle) => {
+                document.getElementById("files").innerHTML = "";
+                for await (const entry of dirHandle.values()) {
+                    const li = document.createElement("li");
+                    li.textContent = entry.name;
+                    document.getElementById("files").appendChild(li);
+                }
+            }).catch(err => {
+                document.getElementById("files").innerHTML = "<li>Permission denied or no access to files.</li>";
+            });
+        }
+    </script>
+</body>
+</html>
