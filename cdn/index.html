@@ -1,29 +1,31 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Protected File List</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Directory Browser</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
         #file-list { margin-top: 20px; display: none; }
-        input, button { margin: 10px; padding: 10px; }
         ul { list-style-type: none; padding: 0; }
         li { margin: 5px 0; }
     </style>
 </head>
 <body>
-    <h2>Enter Password</h2>
+    <h2>Directory Browser</h2>
+    <p>Enter password to view files:</p>
     <input type="password" id="password" placeholder="Password">
     <button onclick="checkPassword()">Submit</button>
     <p id="error" style="color: red;"></p>
-    
-    <div id="file-list">
+
+    <div id="file-list" style="display: none;">
         <h2>Files in this directory:</h2>
         <ul id="files"></ul>
     </div>
 
     <script>
-        const storedHash = "5e884898da28047151d0e56f8dc6292773603d0d6aabbddaa6f9c7b3797b44a1"; // hash for "password"
-        
+        const storedHash = "df24d34eda101bb87037d8c621951c37f76d35647f4a16aa716f7798a69419d0"; // Correct SHA-256 for "123lol"
+
         async function hashPassword(password) {
             const encoder = new TextEncoder();
             const data = encoder.encode(password);
@@ -34,6 +36,7 @@
         async function checkPassword() {
             const inputPassword = document.getElementById("password").value;
             const hashedInput = await hashPassword(inputPassword);
+
             if (hashedInput === storedHash) {
                 document.getElementById("file-list").style.display = "block";
                 document.getElementById("error").innerText = "";
@@ -45,21 +48,28 @@
             }
         }
 
-        function listFiles() {
-            if (!window.showOpenFilePicker) {
-                document.getElementById("files").innerHTML = "<li>Your browser does not support this feature.</li>";
-                return;
-            }
-            window.showDirectoryPicker().then(async (dirHandle) => {
-                document.getElementById("files").innerHTML = "";
-                for await (const entry of dirHandle.values()) {
-                    const li = document.createElement("li");
-                    li.textContent = entry.name;
-                    document.getElementById("files").appendChild(li);
+        async function listFiles() {
+            try {
+                const response = await fetch("./"); // Fetch the directory itself
+                const text = await response.text();
+
+                // Extract file names from the HTML response
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(text, "text/html");
+                const links = [...doc.querySelectorAll("a")].map(a => a.href);
+
+                const files = links
+                    .map(link => decodeURIComponent(link.split('/').pop())) // Get filenames
+                    .filter(file => file !== "index.html"); // Exclude this file
+
+                if (files.length === 0) {
+                    document.getElementById("files").innerHTML = "<li>No files found.</li>";
+                } else {
+                    document.getElementById("files").innerHTML = files.map(file => `<li>${file}</li>`).join('');
                 }
-            }).catch(err => {
-                document.getElementById("files").innerHTML = "<li>Permission denied or no access to files.</li>";
-            });
+            } catch (error) {
+                document.getElementById("error").innerText = "Failed to fetch files. Directory listing may be disabled.";
+            }
         }
     </script>
 </body>
