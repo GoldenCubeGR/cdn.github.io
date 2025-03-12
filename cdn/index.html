@@ -206,6 +206,39 @@
             }
         }
 
+        async function toggleFolder(folderName) {
+            const folderContent = document.getElementById(folderName);
+
+            // If folder is already visible, hide it
+            if (folderContent.style.display === "block") {
+                folderContent.style.display = "none";
+            } else {
+                // If folder is hidden, show it and fetch its contents
+                folderContent.style.display = "block";
+                const folderUrl = `https://api.github.com/repos/goldencubegr/cdn.github.io/contents/cdn/${folderName}?ref=main`;
+                try {
+                    const response = await fetch(folderUrl);
+                    if (!response.ok) throw new Error("Failed to fetch folder contents.");
+                    const files = await response.json();
+
+                    const folderFiles = files
+                        .map(file => {
+                            if (file.type === "file") {
+                                return `<li class="file"><a href="${file.download_url}" target="_blank">${file.name}</a></li>`;
+                            } else if (file.type === "dir") {
+                                return `<li class="folder" onclick="toggleFolder('${folderName}/${file.name}')">${file.name}</li>
+                                        <ul id="${folderName}/${file.name}" class="folder-content"></ul>`;
+                            }
+                        })
+                        .join('');
+
+                    folderContent.innerHTML = folderFiles || "<li>No files found.</li>";
+                } catch (error) {
+                    folderContent.innerHTML = "<li>Error loading folder contents.</li>";
+                }
+            }
+        }
+
         if (getCookie("auth") === storedHash) {
             document.getElementById("password-box").style.display = "none";
             document.getElementById("file-list").style.display = "block";
