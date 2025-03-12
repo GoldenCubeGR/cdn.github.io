@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Directory Browser</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body {
             font-family: "Courier New", Courier, monospace;
@@ -39,12 +40,13 @@
             text-decoration: underline;
         }
 
-        .file {
+        .file, .folder {
             padding: 2px 0;
+            display: flex;
+            align-items: center;
         }
 
         .folder {
-            padding: 2px 0;
             font-weight: bold;
             cursor: pointer;
         }
@@ -102,6 +104,9 @@
             background-color: #005fa3;
         }
 
+        .icon {
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body>
@@ -111,7 +116,7 @@
             <p>Powered by GitHub Pages (Modernized Apache-like look)</p>
         </div>
 
-        <div class="password-box">
+        <div class="password-box" id="password-box">
             <h2>Enter Password to View Files</h2>
             <input type="password" id="password" placeholder="Password">
             <button onclick="checkPassword()">Submit</button>
@@ -132,6 +137,21 @@
         const storedHash = "df24d34eda101bb87037d8c621951c37f76d35647f4a16aa716f7798a69419d0"; // SHA-256 for "123lol"
         const githubApiUrl = "https://api.github.com/repos/goldencubegr/cdn.github.io/contents/cdn?ref=main";
 
+        function setCookie(name, value, hours) {
+            let date = new Date();
+            date.setTime(date.getTime() + (hours * 60 * 60 * 1000));
+            document.cookie = `${name}=${value}; expires=${date.toUTCString()}; path=/`;
+        }
+
+        function getCookie(name) {
+            const cookies = document.cookie.split('; ');
+            for (let cookie of cookies) {
+                let [key, value] = cookie.split('=');
+                if (key === name) return value;
+            }
+            return null;
+        }
+
         async function hashPassword(password) {
             const encoder = new TextEncoder();
             const data = encoder.encode(password);
@@ -144,10 +164,9 @@
             const hashedInput = await hashPassword(inputPassword);
 
             if (hashedInput === storedHash) {
+                setCookie("auth", hashedInput, 3); // Save cookie for 3 hours
+                document.getElementById("password-box").style.display = "none";
                 document.getElementById("file-list").style.display = "block";
-                document.getElementById("error").innerText = "";
-                document.getElementById("password").style.display = "none";
-                document.querySelector("button").style.display = "none";
                 listFiles();
             } else {
                 document.getElementById("error").innerText = "Incorrect password!";
@@ -159,55 +178,38 @@
                 const response = await fetch(githubApiUrl);
                 if (!response.ok) throw new Error("Failed to fetch files.");
                 const files = await response.json();
+                
+                const fileIcons = {
+                    "txt": "fa-file-alt",
+                    "jpg": "fa-file-image",
+                    "jpeg": "fa-file-image",
+                    "png": "fa-file-image",
+                    "gif": "fa-file-image",
+                    "pdf": "fa-file-pdf",
+                    "zip": "fa-file-archive",
+                    "default": "fa-file"
+                };
 
-                const fileList = files
-                    .map(file => {
-                        if (file.type === "file") {
-                            return `<li class="file"><a href="${file.download_url}" target="_blank">${file.name}</a></li>`;
-                        } else if (file.type === "dir") {
-                            return `<li class="folder" onclick="toggleFolder('${file.name}')">${file.name}</li>
-                                    <ul id="${file.name}" class="folder-content"></ul>`;
-                        }
-                    })
-                    .join('');
-
+                const fileList = files.map(file => {
+                    let ext = file.name.split('.').pop().toLowerCase();
+                    let iconClass = fileIcons[ext] || fileIcons.default;
+                    if (file.type === "dir") {
+                        return `<li class="folder" onclick="toggleFolder('${file.name}')"><i class="fas fa-folder icon"></i>${file.name}</li><ul id="${file.name}" class="folder-content"></ul>`;
+                    } else {
+                        return `<li class="file"><i class="fas ${iconClass} icon"></i><a href="${file.download_url}" target="_blank">${file.name}</a></li>`;
+                    }
+                }).join('');
+                
                 document.getElementById("files").innerHTML = fileList || "<li>No files found.</li>";
             } catch (error) {
                 document.getElementById("error").innerText = "Failed to load files.";
             }
         }
 
-        async function toggleFolder(folderName) {
-            const folderContent = document.getElementById(folderName);
-
-            // If folder is already visible, hide it
-            if (folderContent.style.display === "block") {
-                folderContent.style.display = "none";
-            } else {
-                // If folder is hidden, show it and fetch its contents
-                folderContent.style.display = "block";
-                const folderUrl = `https://api.github.com/repos/goldencubegr/cdn.github.io/contents/cdn/${folderName}?ref=main`;
-                try {
-                    const response = await fetch(folderUrl);
-                    if (!response.ok) throw new Error("Failed to fetch folder contents.");
-                    const files = await response.json();
-
-                    const folderFiles = files
-                        .map(file => {
-                            if (file.type === "file") {
-                                return `<li class="file"><a href="${file.download_url}" target="_blank">${file.name}</a></li>`;
-                            } else if (file.type === "dir") {
-                                return `<li class="folder" onclick="toggleFolder('${folderName}/${file.name}')">${file.name}</li>
-                                        <ul id="${folderName}/${file.name}" class="folder-content"></ul>`;
-                            }
-                        })
-                        .join('');
-
-                    folderContent.innerHTML = folderFiles || "<li>No files found.</li>";
-                } catch (error) {
-                    folderContent.innerHTML = "<li>Error loading folder contents.</li>";
-                }
-            }
+        if (getCookie("auth") === storedHash) {
+            document.getElementById("password-box").style.display = "none";
+            document.getElementById("file-list").style.display = "block";
+            listFiles();
         }
     </script>
 </body>
